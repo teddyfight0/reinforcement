@@ -49,7 +49,7 @@ def question2c():
     """
     # 高折扣率让智能体重视长远奖励，低噪声让它敢冒险走悬崖边
     # living reward为0，不影响决策
-    answerDiscount = 0.9
+    answerDiscount = 0.99
     answerNoise = 0.0
     answerLivingReward = 0.0
     return answerDiscount, answerNoise, answerLivingReward

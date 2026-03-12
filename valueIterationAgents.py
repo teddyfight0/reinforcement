@@ -64,7 +64,7 @@ class ValueIterationAgent(ValueEstimationAgent):
           Run the value iteration algorithm. Note that in standard
           value iteration, V_k+1(...) depends on V_k(...)'s.
         """
-        for i in range(self.iterations):
+        for k in range(self.iterations):
             # 创建一个新的计数器来存储下一次迭代的值
             newValues = util.Counter()
             

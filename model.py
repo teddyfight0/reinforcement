@@ -3,92 +3,78 @@ import numpy as np
 
 class DeepQNetwork():
     """
-    A model that uses a Deep Q-value Network (DQN) to approximate Q(s,a) as part
-    of reinforcement learning.
+    Deep Q-value Network (DQN) with three hidden layers to approximate Q(s,a).
     """
     def __init__(self, state_dim, action_dim):
-        self.num_actions = action_dim
-        self.state_size = state_dim
+        self.learning_rate = 0.0001
+        self.numTrainingGames = 8600
+        self.batch_size = 128
+        self.hidden_size1 = 512
+        self.hidden_size2 = 256
+        self.hidden_size3 = 128
+        self.print_every = 2000
+        self.update_steps = 0
 
-        # Remember to set self.learning_rate, self.numTrainingGames,
-        # self.parameters, and self.batch_size!
-        "*** YOUR CODE HERE ***"
-        self.learning_rate = 0.00025
-        self.numTrainingGames = 10000
-        self.batch_size = 32
-        self.hidden_size = 256
-        self.W1 = nn.Parameter(state_dim, self.hidden_size)
-        self.b1 = nn.Parameter(1, self.hidden_size)
-        
-        self.W2 = nn.Parameter(self.hidden_size, action_dim)
-        self.b2 = nn.Parameter(1, action_dim)
-        
-        self.parameters = [self.W1, self.b1, self.W2, self.b2]
+        self.W1 = nn.Parameter(state_dim, self.hidden_size1)
+        self.b1 = nn.Parameter(1, self.hidden_size1)
 
-    def set_weights(self, layers):
-        self.parameters = []
-        for i in range(len(layers)):
-            self.parameters.append(layers[i])
+        self.W2 = nn.Parameter(self.hidden_size1, self.hidden_size2)
+        self.b2 = nn.Parameter(1, self.hidden_size2)
 
-    def get_loss(self, states, Q_target):
-        """
-        Returns the Squared Loss between Q values currently predicted 
-        by the network, and Q_target.
-        Inputs:
-            states: a (batch_size x state_dim) numpy array
-            Q_target: a (batch_size x num_actions) numpy array, or None
-        Output:
-            loss node between Q predictions and Q_target
-        """
-        "*** YOUR CODE HERE ***"
-        # 运行网络得到Q值预测
-        Q_predicted = self.run(states)
-        
-        # 计算平方损失
-        loss = nn.SquareLoss(Q_predicted, Q_target)
-        
-        return loss
+        self.W3 = nn.Parameter(self.hidden_size2, self.hidden_size3)
+        self.b3 = nn.Parameter(1, self.hidden_size3)
+
+        self.W4 = nn.Parameter(self.hidden_size3, action_dim)
+        self.b4 = nn.Parameter(1, action_dim)
+
+        self.parameters = [self.W1, self.b1,
+                           self.W2, self.b2,
+                           self.W3, self.b3,
+                           self.W4, self.b4]
 
     def run(self, states):
         """
-        Runs the DQN for a batch of states.
-        The DQN takes the state and returns the Q-values for all possible actions
-        that can be taken. That is, if there are two actions, the network takes
-        as input the state s and computes the vector [Q(s, a_1), Q(s, a_2)]
-        Inputs:
-            states: a (batch_size x state_dim) numpy array
-            Q_target: a (batch_size x num_actions) numpy array, or None
-        Output:
-            result: (batch_size x num_actions) numpy array of Q-value
-                scores, for each of the actions
+        Forward pass for a batch of states.
         """
-        "*** YOUR CODE HERE ***"
-        # 前向传播：两层神经网络
-        # 第一层：线性变换 + bias + ReLU激活
         z1 = nn.AddBias(nn.Linear(states, self.W1), self.b1)
         a1 = nn.ReLU(z1)
-        
-        # 第二层（输出层）：线性变换 + bias（不需要激活函数）
+
         z2 = nn.AddBias(nn.Linear(a1, self.W2), self.b2)
-        
-        return z2
+        a2 = nn.ReLU(z2)
+
+        z3 = nn.AddBias(nn.Linear(a2, self.W3), self.b3)
+        a3 = nn.ReLU(z3)
+
+        z4 = nn.AddBias(nn.Linear(a3, self.W4), self.b4)
+        return z4
+
+    def set_weights(self, layers):
+        self.parameters = []
+        for layer in layers:
+            self.parameters.append(layer)
+
+    def get_loss(self, states, Q_target):
+        """
+        Squared loss between predicted Q-values and targets.
+        """
+        Q_predicted = self.run(states)
+        return nn.SquareLoss(Q_predicted, Q_target)
 
     def gradient_update(self, states, Q_target):
         """
-        Update your parameters by one gradient step with the .update(...) function.
-        Inputs:
-            states: a (batch_size x state_dim) numpy array
-            Q_target: a (batch_size x num_actions) numpy array, or None
-        Output:
-            None
+        One gradient descent step.
         """
-        "*** YOUR CODE HERE ***"
-        # 计算损失
         loss = self.get_loss(states, Q_target)
-        
-        # 计算梯度
         gradients = nn.gradients(loss, self.parameters)
-        
-        # 更新参数
         for param, grad in zip(self.parameters, gradients):
             param.update(grad, -self.learning_rate)
+
+        self.update_steps += 1
+        if self.update_steps % self.print_every == 0:
+            loss_scalar = nn.as_scalar(loss)
+            grad_norms = [np.linalg.norm(g.data) for g in gradients]
+            max_grad = max(grad_norms) if grad_norms else 0.0
+            print(f"[DQN] step={self.update_steps:6d} "
+                  f"loss={loss_scalar:8.4f} "
+                  f"max_grad={max_grad:8.4f} "
+                  f"lr={self.learning_rate}", flush=True)
