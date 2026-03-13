@@ -7,7 +7,7 @@ class DeepQNetwork():
     """
     def __init__(self, state_dim, action_dim):
         self.learning_rate = 0.0001
-        self.numTrainingGames = 8600
+        self.numTrainingGames = 10000
         self.batch_size = 128
         self.hidden_size1 = 512
         self.hidden_size2 = 256
