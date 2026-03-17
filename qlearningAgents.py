@@ -49,8 +49,7 @@ class QLearningAgent(ReinforcementAgent):
         ReinforcementAgent.__init__(self, **args)
 
         "*** YOUR CODE HERE ***"
-        # 初始化Q值表，使用Counter来存储Q(state, action)值
-        self.qValues = util.Counter()
+        self.qValue = util.Counter()
 
     def getQValue(self, state, action):
         """
@@ -59,8 +58,7 @@ class QLearningAgent(ReinforcementAgent):
           or the Q node value otherwise
         """
         "*** YOUR CODE HERE ***"
-        # 返回Q(state, action)的值，如果从未见过该状态-动作对，返回0.0
-        return self.qValues[(state, action)]
+        return self.qValue[(state, action)]
 
     def computeValueFromQValues(self, state):
         """
@@ -70,20 +68,11 @@ class QLearningAgent(ReinforcementAgent):
           terminal state, you should return a value of 0.0.
         """
         "*** YOUR CODE HERE ***"
-        # 获取该状态的所有合法动作
-        legalActions = self.getLegalActions(state)
-        
-        # 如果没有合法动作（终止状态），返回0.0
-        if not legalActions:
+        possibleActions = self.getLegalActions(state)
+        if not possibleActions:
             return 0.0
-        
-        # 返回所有合法动作中Q值最大的那个
-        maxQValue = float('-inf')
-        for action in legalActions:
-            qValue = self.getQValue(state, action)
-            maxQValue = max(maxQValue, qValue)
-        
-        return maxQValue
+        return max(self.getQValue(state, action) for action in possibleActions)
+
 
     def computeActionFromQValues(self, state):
         """
@@ -92,24 +81,12 @@ class QLearningAgent(ReinforcementAgent):
           you should return None.
         """
         "*** YOUR CODE HERE ***"
-        # 获取该状态的所有合法动作
-        legalActions = self.getLegalActions(state)
-        
-        # 如果没有合法动作（终止状态），返回None
-        if not legalActions:
+        possibleActions = self.getLegalActions(state)
+        if not possibleActions:
             return None
-        
-        # 找到Q值最大的动作
-        bestAction = None
-        bestQValue = float('-inf')
-        
-        for action in legalActions:
-            qValue = self.getQValue(state, action)
-            if qValue > bestQValue:
-                bestQValue = qValue
-                bestAction = action
-        
-        return bestAction
+        return max(possibleActions, key=lambda action: self.getQValue(state, action))
+
+
 
     def getAction(self, state):
         """
@@ -125,19 +102,12 @@ class QLearningAgent(ReinforcementAgent):
         legalActions = self.getLegalActions(state)
         action = None
         "*** YOUR CODE HERE ***"
-        
-        # 如果没有合法动作，返回None
         if not legalActions:
-            return None
-        
-        # epsilon-贪心策略：以epsilon概率随机选择动作，否则选择最优动作
+            return action
         if util.flipCoin(self.epsilon):
-            # 随机选择动作
             action = random.choice(legalActions)
         else:
-            # 选择最优动作
             action = self.computeActionFromQValues(state)
-
         return action
 
     def update(self, state, action, nextState, reward: float):
@@ -149,20 +119,8 @@ class QLearningAgent(ReinforcementAgent):
           it will be called on your behalf
         """
         "*** YOUR CODE HERE ***"
-        # Q-Learning更新公式：
-        # Q(s,a) ← Q(s,a) + α[r + γ max Q(s',a') - Q(s,a)]
-        
-        # 获取当前Q值
-        currentQ = self.getQValue(state, action)
-        
-        # 获取下一状态的最大Q值
-        nextStateValue = self.computeValueFromQValues(nextState)
-        
-        # 计算新的Q值
-        newQ = currentQ + self.alpha * (reward + self.discount * nextStateValue - currentQ)
-        
-        # 更新Q值表
-        self.qValues[(state, action)] = newQ
+        sample = reward + (self.discount * self.getValue(nextState))
+        self.qValue[(state, action)] = ((1 - self.alpha) * self.getQValue(state, action)) + (self.alpha * sample)
 
     def getPolicy(self, state):
         return self.computeActionFromQValues(state)
@@ -222,40 +180,20 @@ class ApproximateQAgent(PacmanQAgent):
           where * is the dotProduct operator
         """
         "*** YOUR CODE HERE ***"
-        # 获取特征向量
         features = self.featExtractor.getFeatures(state, action)
-        
-        # 计算Q值：Q(s,a) = w · f(s,a) = Σ w_i * f_i(s,a)
-        qValue = 0.0
-        for feature, value in features.items():
-            qValue += self.weights[feature] * value
-        
+        qValue = sum(self.weights[feature] * value for feature, value in features.items())
         return qValue
+
 
     def update(self, state, action, nextState, reward: float):
         """
            Should update your weights based on transition
         """
         "*** YOUR CODE HERE ***"
-        # 近似Q-Learning权重更新公式：
-        # 对于每个特征 i: w_i ← w_i + α * difference * f_i(s,a)
-        # 其中 difference = [r + γ max Q(s',a') - Q(s,a)]
-        
-        # 获取特征向量
+        correction = (reward + self.discount * self.getValue(nextState)) - self.getQValue(state, action)
         features = self.featExtractor.getFeatures(state, action)
-        
-        # 计算当前Q值
-        currentQ = self.getQValue(state, action)
-        
-        # 计算下一状态的最大Q值
-        nextStateValue = self.computeValueFromQValues(nextState)
-        
-        # 计算差值（TD error）
-        difference = reward + self.discount * nextStateValue - currentQ
-        
-        # 更新每个特征的权重
         for feature, value in features.items():
-            self.weights[feature] += self.alpha * difference * value
+            self.weights[feature] += self.alpha * correction * value
 
     def final(self, state):
         """Called at the end of each game."""
@@ -266,4 +204,11 @@ class ApproximateQAgent(PacmanQAgent):
         if self.episodesSoFar == self.numTraining:
             # you might want to print your weights here for debugging
             "*** YOUR CODE HERE ***"
-            pass
+            print("Approximate Q-Learning Summary")
+            print(f"Learning rate(alpha) : {self.alpha}")
+            print(f"Discount rate(gamma) : {self.gamma}")
+            print(f"Exploration rate(epsilon) : {self.epsilon}")
+            print(f"Training episodes : {self.numTraining}")
+            print("=======Feature Weights=======")
+            # for i in features:
+            #     print(f"{i} : {self.weights[i]}")
